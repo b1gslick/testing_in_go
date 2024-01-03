@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -16,7 +17,7 @@ func main() {
 	doneChan := make(chan bool)
 
 	// start a goroutine to read user input and run program
-	go readUserInput(doneChan)
+	go readUserInput(os.Stdin, doneChan)
 	// block until the doneChan gets a value
 
 	<-doneChan
@@ -27,8 +28,8 @@ func main() {
 	fmt.Println("Goodbye.")
 }
 
-func readUserInput(doneChan chan bool) {
-	scanner := bufio.NewScanner(os.Stdin)
+func readUserInput(in io.Reader, doneChan chan bool) {
+	scanner := bufio.NewScanner(in)
 	for {
 		res, done := checkNumbers(scanner)
 		if done {
@@ -51,7 +52,7 @@ func checkNumbers(scanner *bufio.Scanner) (string, bool) {
 	// try to convert what the user type into an input
 	numToCheck, err := strconv.Atoi(scanner.Text())
 	if err != nil {
-		return "Please enter a whole number", false
+		return "Please enter a whole number!", false
 	}
 
 	_, msg := isPrime(numToCheck)

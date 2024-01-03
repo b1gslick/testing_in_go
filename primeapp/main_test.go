@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"io"
 	"os"
 	"strings"
@@ -87,4 +89,41 @@ func Test_intro(t *testing.T) {
 	if !strings.Contains(string(out), "Enter a whole number") {
 		t.Errorf("incorrect prompt: expected 'Enter a whole number' but got %s", string(out))
 	}
+}
+
+func Test_checkNumbers(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{name: "empty", input: "", expected: "Please enter a whole number!"},
+		{name: "number", input: "7", expected: "7 is a prime number!"},
+		{name: "quit", input: "q", expected: ""},
+	}
+
+	for _, e := range tests {
+
+		input := strings.NewReader(e.input)
+		reader := bufio.NewScanner(input)
+		res, _ := checkNumbers(reader)
+
+		if !strings.EqualFold(res, e.expected) {
+			t.Errorf("%s incorrect value\n returned: %s\n expected: %s", e.name, res, e.expected)
+		}
+	}
+}
+
+func Test_readUserInput(t *testing.T) {
+	// to test this funcdtion, we need a channel,
+	// and an instance of an io.Reader
+	doneChan := make(chan bool)
+	// create a reference to a bytes.Buffer
+	var stdin bytes.Buffer
+
+	stdin.Write([]byte("1\nq\n"))
+
+	go readUserInput(&stdin, doneChan)
+	<-doneChan
+	close(doneChan)
 }
