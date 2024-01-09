@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -23,7 +25,6 @@ func Test_application_handlers(t *testing.T) {
 	ts := httptest.NewTLSServer(routes)
 	defer ts.Close()
 
-	pathToTemplates = "./../../templates/"
 	// range throught test data
 	for _, e := range theTests {
 		resp, err := ts.Client().Get(ts.URL + e.url)
@@ -38,20 +39,58 @@ func Test_application_handlers(t *testing.T) {
 }
 
 func TestAppHome(t *testing.T) {
-	// create a request
+	tests := []struct {
+		name         string
+		putInSession string
+		exceptedHTML string
+	}{
+		{"first visit", "", "<small>From Session:"},
+		{"second visit", "hello, world!", "<small>From Session: hello, world!"},
+	}
+
+	for _, e := range tests {
+		req, _ := http.NewRequest("GET", "/", nil)
+
+		req = addContextAndSessionToRequest(req, app)
+		_ = app.Session.Destroy(req.Context())
+
+		if e.putInSession != "" {
+			app.Session.Put(req.Context(), "test", e.putInSession)
+		}
+
+		rr := httptest.NewRecorder()
+
+		handler := http.HandlerFunc(app.Home)
+
+		handler.ServeHTTP(rr, req)
+
+		// check status code
+		if rr.Code != http.StatusOK {
+			t.Errorf("TestAppHome return wrong status code; expected 200 but got %d", rr.Code)
+		}
+
+		body, _ := io.ReadAll(rr.Body)
+		if !strings.Contains(string(body), e.exceptedHTML) {
+			t.Errorf("%s: did not find %s in response body", e.name, e.exceptedHTML)
+		}
+	}
+}
+
+func TestApp_renderWithBadTemplate(t *testing.T) {
+	// set temeplate path to a location with a bad template
+	pathToTemplates = "./testdata/"
+
 	req, _ := http.NewRequest("GET", "/", nil)
 	req = addContextAndSessionToRequest(req, app)
-
 	rr := httptest.NewRecorder()
 
-	handler := http.HandlerFunc(app.Home)
+	err := app.render(rr, req, "bad.page.gohtml", &TemplateData{})
 
-	handler.ServeHTTP(rr, req)
-
-	// check status code
-	if rr.Code != http.StatusOK {
-		t.Errorf("TestAppHome return wrong status code; expected 200 but got %d", rr.Code)
+	if err == nil {
+		t.Error("expected error from bad template, but did not get one")
 	}
+
+	pathToTemplates = "./../../templates/"
 }
 
 func getCtx(req *http.Request) context.Context {
